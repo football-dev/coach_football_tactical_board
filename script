@@ -1,0 +1,164 @@
+const field = document.querySelector('.field');
+const addPlayerButtons = document.querySelectorAll('.add-player');
+
+let teamACounter = 1; // Start from 1 for Team A
+let teamBCounter = 1; // Start from 1 for Team B
+let isDragging = false;
+let startX, startY; // Drag start positions
+let selectedPlayers = new Set(); // Track selected players
+let selectionBox = null; // Selection box for multi-selection
+let isSelecting = false; // Track if selection box is active
+
+// Add new players when buttons are clicked
+addPlayerButtons.forEach(button => {
+    button.addEventListener('click', () => {
+        const team = button.classList.contains('team-a') ? 'team-a' : 'team-b';
+        addNewPlayer(team);
+    });
+});
+
+// Function to add a new player
+function addNewPlayer(team) {
+    const newPlayer = document.createElement('div');
+    newPlayer.classList.add('player', team);
+
+    // Assign the correct player number
+    if (team === 'team-a') {
+        newPlayer.textContent = teamACounter++;
+    } else if (team === 'team-b') {
+        newPlayer.textContent = teamBCounter++;
+    }
+
+    // Start position near the center
+    newPlayer.style.left = '380px';
+    newPlayer.style.top = '230px';
+
+    // Add click event for multi-select
+    newPlayer.addEventListener('click', (e) => {
+        if (e.metaKey || e.ctrlKey) {
+            // Multi-select with CMD/CTRL
+            if (selectedPlayers.has(newPlayer)) {
+                selectedPlayers.delete(newPlayer);
+                newPlayer.classList.remove('selected');
+            } else {
+                selectedPlayers.add(newPlayer);
+                newPlayer.classList.add('selected');
+            }
+        } else {
+            // Clear previous selections if no CMD/CTRL is held
+            selectedPlayers.forEach(player => player.classList.remove('selected'));
+            selectedPlayers.clear();
+            selectedPlayers.add(newPlayer);
+            newPlayer.classList.add('selected');
+        }
+    });
+
+    // Add mousedown event for dragging
+    newPlayer.addEventListener('mousedown', (e) => {
+        if (!isSelecting) {
+            e.preventDefault();
+            isDragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+        }
+    });
+
+    // Append the new player to the field
+    field.appendChild(newPlayer);
+}
+
+// Handle dragging of selected players
+document.addEventListener('mousemove', (e) => {
+    if (isDragging && selectedPlayers.size > 0) {
+        const offsetX = e.clientX - startX;
+        const offsetY = e.clientY - startY;
+
+        // Move all selected players
+        selectedPlayers.forEach(player => {
+            const currentLeft = parseInt(player.style.left);
+            const currentTop = parseInt(player.style.top);
+            player.style.left = `${currentLeft + offsetX}px`;
+            player.style.top = `${currentTop + offsetY}px`;
+        });
+
+        // Update the starting positions
+        startX = e.clientX;
+        startY = e.clientY;
+    }
+});
+
+// Stop dragging on mouseup
+document.addEventListener('mouseup', () => {
+    if (isDragging) {
+        isDragging = false;
+    }
+    if (selectionBox) {
+        selectionBox.remove();
+        selectionBox = null;
+    }
+});
+
+// Create a selection box on mousedown
+field.addEventListener('mousedown', (e) => {
+    if (!e.metaKey && !e.ctrlKey) {
+        isSelecting = true;
+        startX = e.clientX;
+        startY = e.clientY;
+
+        // Create the selection box element
+        selectionBox = document.createElement('div');
+        selectionBox.className = 'selection-box';
+        document.body.appendChild(selectionBox);
+
+        selectionBox.style.left = `${startX}px`;
+        selectionBox.style.top = `${startY}px`;
+    }
+});
+
+// Update selection box size and highlight players within it
+document.addEventListener('mousemove', (e) => {
+    if (isSelecting && selectionBox) {
+        const currentX = e.clientX;
+        const currentY = e.clientY;
+
+        const rectX = Math.min(startX, currentX);
+        const rectY = Math.min(startY, currentY);
+        const rectWidth = Math.abs(startX - currentX);
+        const rectHeight = Math.abs(startY - currentY);
+
+        selectionBox.style.left = `${rectX}px`;
+        selectionBox.style.top = `${rectY}px`;
+        selectionBox.style.width = `${rectWidth}px`;
+        selectionBox.style.height = `${rectHeight}px`;
+
+        // Highlight players within the selection box
+        document.querySelectorAll('.player').forEach(player => {
+            const playerRect = player.getBoundingClientRect();
+            const isIntersecting = !(
+                playerRect.right < rectX ||
+                playerRect.left > rectX + rectWidth ||
+                playerRect.bottom < rectY ||
+                playerRect.top > rectY + rectHeight
+            );
+
+            if (isIntersecting) {
+                player.classList.add('selected');
+                selectedPlayers.add(player);
+            } else if (!e.shiftKey) {
+                player.classList.remove('selected');
+                selectedPlayers.delete(player);
+            }
+        });
+    }
+});
+
+// Stop selecting on mouseup
+document.addEventListener('mouseup', () => {
+    if (isSelecting) {
+        isSelecting = false;
+        if (selectionBox) {
+            selectionBox.remove();
+            selectionBox = null;
+        }
+    }
+});
